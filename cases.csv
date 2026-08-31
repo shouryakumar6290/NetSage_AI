@@ -1,0 +1,115 @@
+case_id,title,symptom,topology_note,show_output,expected_fault,osi_layer,concept,severity,expected_next_command,expected_fix
+NS-001,PC cannot ping server in same VLAN,PC1 gets an IP but cannot reach Server1.,PC1 is on Fa0/1, Server1 is on Fa0/2. Both should be VLAN 10.,"Switch# show vlan brief
+1    default                          active    Fa0/3, Fa0/4
+10   Servers                          active    Fa0/1
+20   Clients                          active    Fa0/2",PC and Server are in different VLANs (Fa0/2 is in VLAN 20 instead of 10),Layer 2,VLAN,Medium,show interfaces status,Reassign Fa0/2 to VLAN 10 using 'switchport access vlan 10'.
+NS-002,Missing VLAN on switch,Users report no network access.,PC is connected to Fa0/1 configured for VLAN 30.,"Switch# show vlan brief
+1    default                          active    Fa0/2, Fa0/3
+10   Servers                          active    
+20   Clients                          active    ",VLAN 30 does not exist in the VLAN database.,Layer 2,VLAN,High,show running-config interface fa0/1,Create VLAN 30 using 'vlan 30'.
+NS-003,VLAN interface is down,Cannot route between VLANs.,Router is doing router-on-a-stick. VLAN 10 and 20 configured.,"Router# show ip interface brief
+Interface              IP-Address      OK? Method Status                Protocol
+GigabitEthernet0/0     unassigned      YES unset  up                    up
+GigabitEthernet0/0.10  192.168.10.1    YES manual administratively down down
+GigabitEthernet0/0.20  192.168.20.1    YES manual up                    up",Subinterface Gi0/0.10 is administratively down.,Layer 1/2,Interface Status,High,show running-config interface gi0/0.10,Run 'no shutdown' on interface Gi0/0.10.
+NS-004,Native VLAN mismatch,CDP errors and spanning tree issues.,Switch1 connected to Switch2 via trunk.,"Switch1# show interfaces trunk
+Port        Mode         Encapsulation  Status        Native vlan
+Fa0/24      on           802.1q         trunking      1
+
+Switch2# show interfaces trunk
+Port        Mode         Encapsulation  Status        Native vlan
+Fa0/24      on           802.1q         trunking      99",Native VLAN mismatch on trunk link (1 vs 99).,Layer 2,Trunking,Medium,show cdp neighbors detail,Configure native VLAN to match on both ends.
+NS-005,Incorrect Default Gateway on PC,PC1 can ping local devices but cannot reach the internet.,PC1 is on 192.168.1.0/24. Router IP is 192.168.1.1.,"C:\> ipconfig
+IPv4 Address. . . . . . . . . . . : 192.168.1.10
+Subnet Mask . . . . . . . . . . . : 255.255.255.0
+Default Gateway . . . . . . . . . : 192.168.1.254",PC is configured with the wrong default gateway.,Layer 3,Default Gateway,High,ping 192.168.1.1,Change default gateway on PC to 192.168.1.1.
+NS-006,Missing Default Gateway on Switch,Cannot manage the switch from a remote subnet.,Switch management IP is 10.0.0.2.,"Switch# show run | include default-gateway
+(no output)",Switch lacks 'ip default-gateway' configuration.,Layer 3,Management,Low,show running-config,Configure 'ip default-gateway 10.0.0.1' on the switch.
+NS-007,Gateway mismatch in DHCP pool,Clients get IP but cannot browse.,DHCP server configured on Router.,"Router# show run | section dhcp
+ip dhcp pool CLIENTS
+ network 172.16.0.0 255.255.255.0
+ default-router 172.16.1.1",Default router in DHCP pool is outside the subnet.,Layer 3,DHCP,Medium,show ip dhcp binding,Change default-router in DHCP pool to 172.16.0.1.
+NS-008,DHCP Exhaustion,New PCs cannot get an IP address.,Subnet has 50 users. Pool is 192.168.1.0/24.,"Router# show ip dhcp binding
+(Outputs 253 bindings)
+Router# show ip dhcp pool
+Pool CLIENTS : 
+ Utilization mark (high/low)    : 100 / 0
+ Subnet size (first/next)       : 0 / 0 
+ Total addresses                : 254
+ Leased addresses               : 253",DHCP pool is exhausted.,Layer 3,DHCP,High,show ip dhcp pool,Expand the DHCP pool or reduce lease times.
+NS-009,Missing IP helper-address,PCs on VLAN 20 do not get DHCP addresses.,DHCP server is on VLAN 10.,"Router# show run int vlan 20
+interface Vlan20
+ ip address 192.168.20.1 255.255.255.0
+!",No ip helper-address configured on the relay interface.,Layer 3,DHCP Relay,High,show ip interface vlan 20,Add 'ip helper-address <DHCP_SERVER_IP>' to Vlan20 interface.
+NS-010,Excluded addresses conflict,Duplicate IP address warnings on network.,Router DHCP server issues IPs.,"Router# show run | include exclude
+ip dhcp excluded-address 192.168.1.1 192.168.1.5",Static IPs 192.168.1.10-20 are not excluded and are being handed out.,Layer 3,DHCP,Medium,show ip dhcp conflict,Add 'ip dhcp excluded-address' for the static IP ranges.
+NS-011,Missing DNS Server,Users can ping 8.8.8.8 but cannot open websites.,PC configured via static IP.,"C:\> ipconfig /all
+IPv4 Address: 192.168.1.10
+Subnet Mask: 255.255.255.0
+Default Gateway: 192.168.1.1
+DNS Servers: ",No DNS server configured.,Layer 7,DNS,High,nslookup google.com,Configure DNS server IP on the PC.
+NS-012,Wrong DNS IP in DHCP,Clients cannot resolve names.,DHCP server on router.,"Router# show run | section dhcp
+ip dhcp pool LAN
+ network 10.10.10.0 255.255.255.0
+ dns-server 10.10.11.1",DNS server IP is a typo, should be 10.10.10.1.,Layer 7,DNS,Medium,ping 10.10.11.1,Update the dns-server command in the DHCP pool.
+NS-013,Router domain-lookup disabled,Cannot ping hostnames from router.,Router connected to internet.,"Router# ping google.com
+Translating ""google.com""...domain server (255.255.255.255)
+% Unrecognized host or address, or protocol not running.",ip domain-lookup is disabled or no name-server configured.,Layer 7,DNS,Low,show running-config | include domain,Configure 'ip domain-lookup' and 'ip name-server'.
+NS-014,Missing Static Route,Cannot reach branch office subnet 10.20.0.0/16.,HQ Router connected to Branch Router.,"HQ_Router# show ip route
+C 10.10.0.0/16 is directly connected
+C 192.168.1.0/24 is directly connected",No route to 10.20.0.0/16 exists.,Layer 3,Routing,High,ping 10.20.0.1,Add static route: 'ip route 10.20.0.0 255.255.0.0 <next_hop>'.
+NS-015,Wrong Next Hop,Traffic to internet is failing.,Router connected to ISP.,"Router# show ip route
+S* 0.0.0.0/0 [1/0] via 198.51.100.2",Next hop for default route is wrong (should be 198.51.100.1).,Layer 3,Routing,Critical,show ip interface brief,Correct the default route next-hop.
+NS-016,OSPF Neighbor Down,Missing routes from OSPF peer.,Two routers connected via Gi0/0.,"Router# show ip ospf neighbor
+(no output)",OSPF adjacency is not forming.,Layer 3,OSPF,High,show ip ospf interface,Check OSPF network commands, hello timers, or MTU.
+NS-017,Missing inter-VLAN routing,VLAN 10 cannot ping VLAN 20.,L3 Switch used for routing.,"Switch# show ip route
+(empty)",ip routing is not enabled globally.,Layer 3,Inter-VLAN Routing,High,show running-config | include ip routing,Run 'ip routing' in global configuration mode.
+NS-018,Passive Interface blocks routing,RIP routes not being advertised to neighbor.,Router running RIPv2.,"Router# show ip protocols
+Routing Protocol is ""rip""
+Passive Interface(s):
+  GigabitEthernet0/0",Interface Gi0/0 is passive, blocking routing updates.,Layer 3,Routing,Medium,show run | section rip,Remove 'passive-interface Gi0/0' under router rip.
+NS-019,Implicit Deny blocking traffic,Web server is inaccessible from outside.,Router with ACL applied inbound on WAN.,"Router# show access-lists
+Extended IP access list WAN_IN
+ 10 permit tcp any host 203.0.113.10 eq 80",ACL is missing permit statement for return traffic or other ports, implicit deny blocks it.,Layer 3/4,ACL,High,show ip access-lists,Add required permit rules to the ACL.
+NS-020,Wrong ACL direction,Internal users cannot access the internet.,ACL 100 blocks bad IPs.,"Router# show run int gi0/1
+interface GigabitEthernet0/1
+ ip access-group 100 in",ACL applied inbound on the LAN interface instead of outbound on WAN.,Layer 3,ACL,High,show ip interface,Apply ACL in the correct direction.
+NS-021,Standard ACL placed wrong,PC1 cannot reach Server1, but can't reach anything else either.,Standard ACL blocks PC1 from Server.,"Router# show access-lists
+Standard IP access list 10
+ 10 deny 192.168.1.10
+ 20 permit any",Standard ACL applied too close to source, blocking all traffic from PC1.,Layer 3,ACL,Medium,show ip interface,Use Extended ACL or move Standard ACL closer to destination.
+NS-022,Missing NAT Inside/Outside,Internet access fails for internal users.,Router doing PAT.,"Router# show ip nat statistics
+Total active translations: 0",Interfaces lack 'ip nat inside' or 'ip nat outside'.,Layer 3,NAT,High,show run | include nat,Configure 'ip nat inside' on LAN and 'ip nat outside' on WAN.
+NS-023,Wrong NAT Pool / ACL,Users cannot browse.,NAT overload configured.,"Router# show run | include nat
+ip nat inside source list 2 interface GigabitEthernet0/0 overload
+Router# show access-lists
+Standard IP access list 2
+ 10 permit 10.0.0.0 0.0.0.255",ACL for NAT does not match the actual user subnet (e.g., 192.168.1.0).,Layer 3,NAT,Medium,show ip nat translations,Correct the ACL used for NAT.
+NS-024,Static NAT port typo,External users reach wrong internal port.,Port forwarding to web server.,"Router# show run | include nat
+ip nat inside source static tcp 192.168.1.10 8080 203.0.113.5 80",Traffic to port 80 is forwarded to 8080, but server runs on 80.,Layer 3/4,NAT,Medium,show ip nat translations,Correct static NAT port mapping.
+NS-025,SSID mismatch,Laptops cannot see the Wi-Fi network.,AP configured in autonomous mode.,"AP# show dot11 associations
+(empty)",SSID broadcast is disabled or mismatched.,Layer 1/2,Wireless,High,show running-config interface dot11Radio0,Enable SSID broadcast or fix SSID string.
+NS-026,WPA Key mismatch,Clients try to connect but get rejected.,AP uses WPA2-PSK.,"AP# show logging
+%DOT11-4-CCMP_REPLAY: CCMP replay error",Pre-shared key mismatch between client and AP.,Layer 2,Wireless Security,Medium,show run | section dot11,Update PSK on client to match AP.
+NS-027,AP on wrong switchport VLAN,Wireless users get no IP address.,AP connected to switchport.,"Switch# show interfaces trunk
+(no output)",Switchport connected to AP is an access port instead of a trunk.,Layer 2,Wireless / VLAN,High,show running-config interface fa0/1,Configure the AP switchport as a trunk.
+NS-028,Port Security Violation,PC loses connection after being swapped.,Switchport has port-security enabled.,"Switch# show interfaces fa0/1 status
+Port      Name               Status       Vlan       Duplex  Speed Type
+Fa0/1                        err-disabled 10         auto    auto  10/100BaseTX",Port is in err-disabled state due to MAC violation.,Layer 2,Port Security,High,show port-security interface fa0/1,Shut/no shut the port, or update the secure MAC.
+NS-029,Duplex Mismatch,Slow network performance, high collisions.,Switch connected to old server.,"Switch# show interfaces fa0/1
+FastEthernet0/1 is up, line protocol is up
+  Half-duplex, 100Mb/s
+  ... 12345 collisions, 12 late collisions",Duplex mismatch (Half vs Full).,Layer 1,Duplex,Medium,show interfaces status,Configure 'duplex full' on both sides.
+NS-030,Trunk allowed VLANs restrict traffic,VLAN 20 users cannot reach the router.,Switch trunk to router.,"Switch# show interfaces trunk
+Port        Mode         Encapsulation  Status        Native vlan
+Gi0/1       on           802.1q         trunking      1
+
+Port        Vlans allowed on trunk
+Gi0/1       1,10",VLAN 20 is missing from the allowed VLAN list on the trunk.,Layer 2,Trunking,High,show running-config interface gi0/1,Add VLAN 20 using 'switchport trunk allowed vlan add 20'.
+NS-031,Duplicate IP,Intermittent connection drops.,Two PCs on same subnet.,"Switch# show arp
+Protocol  Address          Age (min)  Hardware Addr   Type   Interface
+Internet  192.168.1.10           0   0000.1111.2222  ARPA   Vlan1
+Internet  192.168.1.10           0   0000.3333.4444  ARPA   Vlan1",Two MAC addresses hold the same IP address.,Layer 3,IP Addressing,High,show arp,Change IP address of one device.
+NS-032,Wrong Subnet Mask,PC cannot ping gateway.,"PC IP: 192.168.1.10, GW: 192.168.1.1","C:\> ipconfig
+IPv4 Address: 192.168.1.10
+Subnet Mask: 255.255.0.0",Subnet mask is too broad (/16 instead of /24), causing incorrect routing.,Layer 3,Subnetting,Medium,ipconfig /all,Correct the subnet mask on the PC.
