@@ -43,3 +43,5 @@ Verification
 1. `cd backend`
 2. `pip install fastapi uvicorn`
 3. `uvicorn main:app --reload`
+
+Made with ❤️ by Shourya Kumar.
