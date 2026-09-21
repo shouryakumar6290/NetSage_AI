@@ -81,3 +81,5 @@ The API will be available at `http://localhost:8000`. You can view the interacti
 ## 🤝 Contributing
 
 Contributions are what make the open-source community such an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
+
+Made with ❤️ by Shourya Kumar.
